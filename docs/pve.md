@@ -2,11 +2,11 @@
 
 ## Mirror
 
-<https://mirrors.tuna.tsinghua.edu.cn/proxmox/iso/>
+<https://fast-mirror.isrc.ac.cn/proxmox/iso/>
 
 <https://fast-mirror.isrc.ac.cn/proxmox/iso/>
 
-<https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cloud-images/noble/current/>
+<https://fast-mirror.isrc.ac.cn/ubuntu-cloud-images/noble/current/>
 
 <https://fast-mirror.isrc.ac.cn/ubuntu-cloud-images/noble/current/>
 
@@ -28,15 +28,15 @@ sudo ddrescue -d -D -f proxmox-ve_9.0-1.iso /dev/sda
 
 ```sh
 # sources pve8
-sed -i 's|^deb http://deb.debian.org|deb https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
-sed -i 's|^deb http://ftp.debian.org|deb https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
-sed -i 's|^deb http://security.debian.org|deb https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
+sed -i 's|^deb http://deb.debian.org|deb https://fast-mirror.isrc.ac.cn|g' /etc/apt/sources.list
+sed -i 's|^deb http://ftp.debian.org|deb https://fast-mirror.isrc.ac.cn|g' /etc/apt/sources.list
+sed -i 's|^deb http://security.debian.org|deb https://fast-mirror.isrc.ac.cn|g' /etc/apt/sources.list
 
 rm /etc/apt/sources.list.d/ceph.list
 rm /etc/apt/sources.list.d/pve-enterprise.list
 
 source /etc/os-release
-echo >> /etc/apt/sources.list "deb https://mirrors.tuna.tsinghua.edu.cn/proxmox/debian $VERSION_CODENAME pve-no-subscription"
+echo >> /etc/apt/sources.list "deb https://fast-mirror.isrc.ac.cn/proxmox/debian $VERSION_CODENAME pve-no-subscription"
 
 # sources pve9
 sed -i 's|^URIs: http://deb.debian.org|URIs: https://fast-mirror.isrc.ac.cn|g' /etc/apt/sources.list.d/debian.sources
@@ -100,18 +100,18 @@ EOF
 ### Image
 
 ```sh
-aria2c -c -x 10 -s 10 https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cloud-images/noble/current/noble-server-cloudimg-amd64.img
+aria2c -c -x 10 -s 10 https://fast-mirror.isrc.ac.cn/ubuntu-cloud-images/noble/current/noble-server-cloudimg-amd64.img
 qemu-img convert -f qcow2 -O raw noble-server-cloudimg-amd64.img noble-server-cloudimg-amd64.raw
 
 mkdir -p /raw
 # fdisk -ul noble-server-cloudimg-amd64.raw
 mount -o loop,offset=$((2099200 * 512)) noble-server-cloudimg-amd64.raw /raw
 
-sed -i "s@http://.*archive.ubuntu.com@http://mirrors.tuna.tsinghua.edu.cn@g" /raw/etc/apt/sources.list.d/ubuntu.sources
-sed -i "s@http://.*security.ubuntu.com@http://mirrors.tuna.tsinghua.edu.cn@g" /raw/etc/apt/sources.list.d/ubuntu.sources
+sed -i "s@http://.*archive.ubuntu.com@http://fast-mirror.isrc.ac.cn@g" /raw/etc/apt/sources.list.d/ubuntu.sources
+sed -i "s@http://.*security.ubuntu.com@http://fast-mirror.isrc.ac.cn@g" /raw/etc/apt/sources.list.d/ubuntu.sources
 
-sed -i "s@http://.*archive.ubuntu.com@http://mirrors.tuna.tsinghua.edu.cn@g" /raw/etc/cloud/cloud.cfg
-sed -i "s@http://.*security.ubuntu.com@http://mirrors.tuna.tsinghua.edu.cn@g" /raw/etc/cloud/cloud.cfg
+sed -i "s@http://.*archive.ubuntu.com@http://fast-mirror.isrc.ac.cn@g" /raw/etc/cloud/cloud.cfg
+sed -i "s@http://.*security.ubuntu.com@http://fast-mirror.isrc.ac.cn@g" /raw/etc/cloud/cloud.cfg
 
 umount /raw
 ```
@@ -344,7 +344,6 @@ qm resize 101 scsi0 10G
       ansible.builtin.file:
         path: /opt/lan
         state: directory
-
     - name: 静态路由 | 4
       ansible.builtin.copy:
         content: |
