@@ -4,7 +4,11 @@
 
 <https://mirrors.tuna.tsinghua.edu.cn/proxmox/iso/>
 
+<https://fast-mirror.isrc.ac.cn/proxmox/iso/>
+
 <https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cloud-images/noble/current/>
+
+<https://fast-mirror.isrc.ac.cn/ubuntu-cloud-images/noble/current/>
 
 <https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso>
 
@@ -35,17 +39,17 @@ source /etc/os-release
 echo >> /etc/apt/sources.list "deb https://mirrors.tuna.tsinghua.edu.cn/proxmox/debian $VERSION_CODENAME pve-no-subscription"
 
 # sources pve9
-sed -i 's|^URIs: http://deb.debian.org|URIs: https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources
-sed -i 's|^URIs: http://ftp.debian.org|URIs: https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources
-sed -i 's|^URIs: http://security.debian.org|URIs: https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources
+sed -i 's|^URIs: http://deb.debian.org|URIs: https://fast-mirror.isrc.ac.cn|g' /etc/apt/sources.list.d/debian.sources
+sed -i 's|^URIs: http://ftp.debian.org|URIs: https://fast-mirror.isrc.ac.cn|g' /etc/apt/sources.list.d/debian.sources
+sed -i 's|^URIs: http://security.debian.org|URIs: https://fast-mirror.isrc.ac.cn|g' /etc/apt/sources.list.d/debian.sources
 
 rm /etc/apt/sources.list.d/ceph.sources
 rm /etc/apt/sources.list.d/pve-enterprise.sources
 
 source /etc/os-release
-cat << EOF >/etc/apt/sources.list.d/proxmox.sources
+cat << EOF > /etc/apt/sources.list.d/proxmox.sources
 Types: deb
-URIs: https://mirrors.tuna.tsinghua.edu.cn/proxmox/debian/pve
+URIs: https://fast-mirror.isrc.ac.cn/proxmox/debian/pve
 Suites: $VERSION_CODENAME
 Components: pve-no-subscription
 Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
@@ -75,7 +79,7 @@ echo >> ~/.bashrc "export LC_ALL='en_US.UTF-8'"
 echo >> ~/.bashrc "PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '"
 
 # vim
-cat << EOF >~/.vimrc
+cat << EOF > ~/.vimrc
 syntax on
 hi Comment ctermfg=6
 let loaded_matchparen=1
@@ -96,18 +100,18 @@ EOF
 ### Image
 
 ```sh
-aria2c -c -x 10 -s 10 https://mirrors.huaweicloud.com/ubuntu-cloud-images/noble/current/noble-server-cloudimg-amd64.img
+aria2c -c -x 10 -s 10 https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cloud-images/noble/current/noble-server-cloudimg-amd64.img
 qemu-img convert -f qcow2 -O raw noble-server-cloudimg-amd64.img noble-server-cloudimg-amd64.raw
 
 mkdir -p /raw
 # fdisk -ul noble-server-cloudimg-amd64.raw
 mount -o loop,offset=$((2099200 * 512)) noble-server-cloudimg-amd64.raw /raw
 
-sed -i "s@http://.*archive.ubuntu.com@http://mirrors.huaweicloud.com@g"  /raw/etc/apt/sources.list.d/ubuntu.sources
-sed -i "s@http://.*security.ubuntu.com@http://mirrors.huaweicloud.com@g" /raw/etc/apt/sources.list.d/ubuntu.sources
+sed -i "s@http://.*archive.ubuntu.com@http://mirrors.tuna.tsinghua.edu.cn@g" /raw/etc/apt/sources.list.d/ubuntu.sources
+sed -i "s@http://.*security.ubuntu.com@http://mirrors.tuna.tsinghua.edu.cn@g" /raw/etc/apt/sources.list.d/ubuntu.sources
 
-sed -i "s@http://.*archive.ubuntu.com@http://mirrors.huaweicloud.com@g"  /raw/etc/cloud/cloud.cfg
-sed -i "s@http://.*security.ubuntu.com@http://mirrors.huaweicloud.com@g" /raw/etc/cloud/cloud.cfg
+sed -i "s@http://.*archive.ubuntu.com@http://mirrors.tuna.tsinghua.edu.cn@g" /raw/etc/cloud/cloud.cfg
+sed -i "s@http://.*security.ubuntu.com@http://mirrors.tuna.tsinghua.edu.cn@g" /raw/etc/cloud/cloud.cfg
 
 umount /raw
 ```
@@ -313,31 +317,55 @@ qm resize 101 scsi0 10G
       ansible.builtin.copy:
         content: |
           [Unit]
-          # /lib/systemd/system/lan_static.service
-          Description = Apply static route rules
-          After = ssh.service
+          # /etc/systemd/system/lan_static.service
+          Description=Apply static route rules
+          # 关键修改 1：绑定到网络服务，当网络服务启动/重启时，本服务也会跟着启动
+          BindsTo=systemd-networkd.service
+          # 关键修改 2：确保在网络服务和网络在线之后执行
+          After=systemd-networkd.service network-online.target
+          Wants=network-online.target
 
           [Service]
           Type=oneshot
-          ExecStart=/bin/sh -c 'bash -x /root/route_add.sh'
-          RemainAfterExit=yes
+          # 关键修改 3：不需要 RemainAfterExit，让它每次网络重启时都能重复执行
+          # RemainAfterExit=yes 删掉或设为 no
+          ExecStart=/bin/sh -c 'bash -x /opt/lan/lan_route.sh'
 
           [Install]
-          WantedBy=default.target
-        dest: /lib/systemd/system/lan_static.service
+          # 关键修改 4：挂载到网络服务的 target 下，而不是 default.target
+          WantedBy=network.target
+        dest: /etc/systemd/system/lan_static.service
         mode: "0644"
     - name: 静态路由 | 2
       ansible.builtin.systemd:
         name: lan_static.service
         enabled: true
     - name: 静态路由 | 3
+      ansible.builtin.file:
+        path: /opt/lan
+        state: directory
+
+    - name: 静态路由 | 4
       ansible.builtin.copy:
         content: |
           #!/bin/bash
+
           set -x
-          lan_ip='192.168.0.0/16'
-          switch=192.168.99.254
-          ip route add $lan_ip via $switch
-        dest: /root/route_add.sh
+
+          lan() {
+              lan_ip='192.168.0.0/16'
+              switch=$(ip a | grep -oP "192.168.\d+" | uniq).254
+
+              ip route add $lan_ip via $switch
+          }
+
+          gw() {
+              switch=$(ip a | grep -oP "192.168.\d+" | uniq).240
+              ip route add 0.0.0.0/0 via $switch
+          }
+
+          # lan
+          # gw
+        dest: /opt/lan/lan_route.sh
         mode: "0755"
 ```
