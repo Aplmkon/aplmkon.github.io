@@ -2,15 +2,11 @@
 
 ## Mirror
 
-<https://fast-mirror.isrc.ac.cn/proxmox/iso/>
-
-<https://fast-mirror.isrc.ac.cn/proxmox/iso/>
-
-<https://fast-mirror.isrc.ac.cn/ubuntu-cloud-images/noble/current/>
-
-<https://fast-mirror.isrc.ac.cn/ubuntu-cloud-images/noble/current/>
-
-<https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso>
+- https://fast-mirror.isrc.ac.cn/proxmox/iso/
+- https://mirrors.tuna.tsinghua.edu.cn/proxmox/iso/
+- https://fast-mirror.isrc.ac.cn/ubuntu-cloud-images/noble/current/
+- https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cloud-images/noble/current/
+- https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso
 
 ## Install
 
@@ -57,7 +53,7 @@ EOF
 
 # apt
 apt update && apt full-upgrade -y
-apt install -y aria2 curl wget htop vim iftop iotop tree netcat-openbsd net-tools ifupdown2
+apt install -y aria2 curl htop iftop ifupdown2 iotop jq netcat-openbsd net-tools tree yq vim wget
 apt install -y libgl1 libegl1
 
 # lvm
@@ -93,6 +89,17 @@ set showmatch
 set hlsearch
 set incsearch
 EOF
+
+# 移除附件硬盘，只保留 1 2 3 节点，其他节点不再保留 hd04
+pvesm status
+pvesm set hd04 --nodes pve1,pve2,pve3
+
+umount /mnt/pve/hd04
+systemctl stop mnt-pve-hd04.mount
+systemctl disable mnt-pve-hd04.mount
+rm -f /etc/systemd/system/mnt-pve-hd04.mount
+systemctl daemon-reload
+rmdir /mnt/pve/hd04
 ```
 
 ## KVM Guest
@@ -100,12 +107,17 @@ EOF
 ### Image
 
 ```sh
+mkdir -p /raw
+
 aria2c -c -x 10 -s 10 https://fast-mirror.isrc.ac.cn/ubuntu-cloud-images/noble/current/noble-server-cloudimg-amd64.img
 qemu-img convert -f qcow2 -O raw noble-server-cloudimg-amd64.img noble-server-cloudimg-amd64.raw
-
-mkdir -p /raw
 # fdisk -ul noble-server-cloudimg-amd64.raw
 mount -o loop,offset=$((2099200 * 512)) noble-server-cloudimg-amd64.raw /raw
+
+aria2c -c -x 10 -s 10 https://fast-mirror.isrc.ac.cn/ubuntu-cloud-images/resolute/current/resolute-server-cloudimg-amd64.img
+qemu-img convert -f qcow2 -O raw resolute-server-cloudimg-amd64.img resolute-server-cloudimg-amd64.raw
+# fdisk -ul resolute-server-cloudimg-amd64.raw
+mount -o loop,offset=$((2324480 * 512)) resolute-server-cloudimg-amd64.raw /raw
 
 sed -i "s@http://.*archive.ubuntu.com@http://fast-mirror.isrc.ac.cn@g" /raw/etc/apt/sources.list.d/ubuntu.sources
 sed -i "s@http://.*security.ubuntu.com@http://fast-mirror.isrc.ac.cn@g" /raw/etc/apt/sources.list.d/ubuntu.sources
