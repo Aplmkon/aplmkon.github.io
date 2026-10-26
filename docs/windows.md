@@ -3,7 +3,7 @@
 ## 快速添加可以远程的用户
 
 ```bat
-net user /add user01 Hello2020
+net user /add user01 Hello1234
 
 net localgroup "Remote Desktop users" /add user01
 ```
